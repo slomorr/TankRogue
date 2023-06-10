@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.utils.TimeUtils;
 
 import java.util.ArrayList;
 import java.util.Random;
@@ -22,18 +23,24 @@ public class Main extends ApplicationAdapter {
 	private OrthographicCamera camera;
 	private SpriteBatch batch;
 	private Tank playerTank;
+	private Texture wallText;
 	private ArrayList<EnemyTank> enemyTanks;
+	private Texture background;
 	private MazeGenerator mazeGenerator;
-	Texture background = new Texture("bar_background.png");
+	private ScoreCounter scoreCounter;
+	private int lastShotTime = 0;
 
 	@Override
 	public void create() {
 		camera = new OrthographicCamera();
+		background = new Texture("bar_background.png");
+		background = new Texture("wall.png");
 		camera.setToOrtho(false, SCREEN_WIDTH, SCREEN_HEIGHT);
 		batch = new SpriteBatch();
-		playerTank = new Tank(new Texture("tank.png"),new Texture("tank.png"), TILE_SIZE, TILE_SIZE, 1920, 1080);
+		playerTank = new Tank(new Texture("player.png"), new Texture("player.png"), TILE_SIZE, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT);
 		enemyTanks = new ArrayList<>();
-		mazeGenerator = new MazeGenerator(background ,MAP_WIDTH, MAP_HEIGHT, 20);
+		mazeGenerator = new MazeGenerator(new Texture("bar_background.png"), MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
+		scoreCounter = new ScoreCounter();
 
 		generateEnemies();
 
@@ -69,8 +76,11 @@ public class Main extends ApplicationAdapter {
 
 		batch.begin();
 
+		batch.draw(background, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
 		drawMaze();
 
+		playerTank.update(Gdx.graphics.getDeltaTime());
 		playerTank.render(batch);
 
 		for (EnemyTank enemyTank : enemyTanks) {
@@ -85,7 +95,7 @@ public class Main extends ApplicationAdapter {
 		for (int x = 0; x < MAP_WIDTH; x++) {
 			for (int y = 0; y < MAP_HEIGHT; y++) {
 				if (mazeGenerator.isWall(x, y)) {
-					Wall wall = new Wall(new Texture("wall.png"), x * TILE_SIZE, y * TILE_SIZE);
+					Wall wall = new Wall(wallText, x * TILE_SIZE, y * TILE_SIZE);
 					wall.render(batch);
 				}
 			}
@@ -106,6 +116,13 @@ public class Main extends ApplicationAdapter {
 		}
 		if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
 			movement.x += 1;
+		}
+		if (Gdx.input.isKeyPressed(Input.Keys.SPACE)) {
+			float currentTime = TimeUtils.nanoTime() / 1000000000.0f;
+			if (currentTime - lastShotTime > 0.5f) {
+				playerTank.fire();
+				lastShotTime = (int) currentTime;
+			}
 		}
 
 		playerTank.move(movement);

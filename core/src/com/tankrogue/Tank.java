@@ -29,7 +29,7 @@ public class Tank {
 
     public Tank(Texture texture, Texture barrelTexture, float x, float y, int screenWidth, int screenHeight) {
         this.texture = texture;
-        this.barrelTexture = barrelTexture;
+        this.barrelTexture = new Texture("bullet.png");
         this.position = new Vector2(x, y);
         this.movement = new Vector2();
         this.bounds = new Rectangle(x, y, texture.getWidth(), texture.getHeight());
@@ -135,13 +135,10 @@ public class Tank {
     }
 
     public void fire() {
-        if (fireCooldown <= 0) {
-            // Создание и выстрел снарядом
-            Vector2 bulletPosition = new Vector2(position.x + texture.getWidth() / 2, position.y + texture.getHeight() / 2);
-            Bullet bullet = new Bullet(barrelTexture, bulletPosition, barrelRotation, this);
-            bullets.add(bullet);
-            fireCooldown = fireRate;
-        }
+        // Создание пули в текущем положении и направлении дула
+        Bullet bullet = new Bullet(barrelTexture, position, rotation, this);
+        // Добавление пули в список активных пуль
+        bullets.add(bullet);
     }
 
     public Rectangle getBounds() {
