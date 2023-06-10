@@ -6,199 +6,117 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.utils.Array;
+
+import java.util.ArrayList;
+import java.util.Random;
 
 public class Main extends ApplicationAdapter {
+	private static final int SCREEN_WIDTH = 1920;
+	private static final int SCREEN_HEIGHT = 1080;
+	private static final int MAP_WIDTH = 30;
+	private static final int MAP_HEIGHT = 30;
 	private static final int TILE_SIZE = 32;
-	private static final int WORLD_WIDTH = 1920;
-	private static final int WORLD_HEIGHT = 1080;
-	private static final float MOVE_SPEED = 5.0f;
-	private static final float BULLET_SPEED = 10.0f;
-	private static final int MAX_ENEMIES = 10;
-
-	private static final float ENEMY_SPEED = 5.0f;
 
 	private OrthographicCamera camera;
 	private SpriteBatch batch;
-	private Texture tankTexture;
-	private Texture bulletTexture;
-	private Texture enemyTexture;
-	private Vector2 tankPosition;
-	private Vector2 tankVelocity;
-	private Array<Rectangle> walls;
-	private Array<Vector2> bullets;
-	private Array<Rectangle> enemies;
-	private BitmapFont font;
-	private int score;
-	private int health;
+	private Tank playerTank;
+	private ArrayList<EnemyTank> enemyTanks;
+	private MazeGenerator mazeGenerator;
+	Texture background = new Texture("bar_background.png");
 
 	@Override
 	public void create() {
 		camera = new OrthographicCamera();
-		camera.setToOrtho(false, WORLD_WIDTH, WORLD_HEIGHT);
-
+		camera.setToOrtho(false, SCREEN_WIDTH, SCREEN_HEIGHT);
 		batch = new SpriteBatch();
+		playerTank = new Tank(new Texture("tank.png"),new Texture("tank.png"), TILE_SIZE, TILE_SIZE, 1920, 1080);
+		enemyTanks = new ArrayList<>();
+		mazeGenerator = new MazeGenerator(background ,MAP_WIDTH, MAP_HEIGHT, 20);
 
-		tankTexture = new Texture("tank.png");
-		bulletTexture = new Texture("bullet.png");
-		enemyTexture = new Texture("enemy.png");
-		tankPosition = new Vector2(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
-		tankVelocity = new Vector2();
-		walls = new Array<>();
-		bullets = new Array<>();
-		enemies = new Array<>();
-		font = new BitmapFont();
-		score = 0;
-		health = 100;
+		generateEnemies();
 
-		generateWorld();
-		spawnEnemies();
+		mazeGenerator.generateMaze();
+
+		Gdx.gl.glClearColor(0.1f, 0.1f, 0.1f, 1f);
 	}
 
-	private void generateWorld() {
-		// Процедурная генерация лабиринта или мира
-		// Реализуйте свою логику генерации мира здесь
-	}
+	private void generateEnemies() {
+		Random random = new Random();
+		int numEnemies = random.nextInt(5) + 5; // Генерация от 5 до 10 противников
 
-	private void spawnEnemies() {
-		for (int i = 0; i < MAX_ENEMIES; i++) {
-			float x = MathUtils.random(0, WORLD_WIDTH - TILE_SIZE);
-			float y = MathUtils.random(0, WORLD_HEIGHT - TILE_SIZE);
-			Rectangle enemy = new Rectangle(x, y, TILE_SIZE, TILE_SIZE);
-			enemies.add(enemy);
+		for (int i = 0; i < numEnemies; i++) {
+			int x = random.nextInt(MAP_WIDTH);
+			int y = random.nextInt(MAP_HEIGHT);
+
+			// Проверка, чтобы противник не спавнился на игроке
+			if (x != playerTank.getPosition().x / TILE_SIZE || y != playerTank.getPosition().y / TILE_SIZE) {
+				EnemyTank enemyTank = new EnemyTank(new Texture("enemy.png"), new Texture("enemy.png"), x * TILE_SIZE, y * TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT, playerTank);
+				enemyTanks.add(enemyTank);
+			}
 		}
 	}
 
 	@Override
 	public void render() {
 		handleInput();
-		update();
 
-		Gdx.gl.glClearColor(0.2f, 0.2f, 0.2f, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
 		camera.update();
 		batch.setProjectionMatrix(camera.combined);
 
 		batch.begin();
-		batch.draw(tankTexture, tankPosition.x, tankPosition.y);
 
-		for (Rectangle wall : walls) {
-			batch.draw(tankTexture, wall.x, wall.y);
+		drawMaze();
+
+		playerTank.render(batch);
+
+		for (EnemyTank enemyTank : enemyTanks) {
+			enemyTank.update(Gdx.graphics.getDeltaTime());
+			enemyTank.render(batch);
 		}
-
-		for (Vector2 bullet : bullets) {
-			batch.draw(bulletTexture, bullet.x, bullet.y);
-		}
-
-		for (Rectangle enemy : enemies) {
-			batch.draw(enemyTexture, enemy.x, enemy.y);
-		}
-
-		font.draw(batch, "Score: " + score, 10, WORLD_HEIGHT - 10);
-		font.draw(batch, "Health: " + health, 10, WORLD_HEIGHT - 30);
 
 		batch.end();
 	}
 
-	private void handleInput() {
-		tankVelocity.set(0, 0);
-
-		if (Gdx.input.isKeyPressed(Input.Keys.UP)) {
-			tankVelocity.y = MOVE_SPEED;
-		}
-		if (Gdx.input.isKeyPressed(Input.Keys.DOWN)) {
-			tankVelocity.y = -MOVE_SPEED;
-		}
-		if (Gdx.input.isKeyPressed(Input.Keys.LEFT)) {
-			tankVelocity.x = -MOVE_SPEED;
-		}
-		if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
-			tankVelocity.x = MOVE_SPEED;
-		}
-
-		if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
-			Vector2 bulletPosition = new Vector2(tankPosition.x + tankTexture.getWidth() / 2 - bulletTexture.getWidth() / 2,
-					tankPosition.y + tankTexture.getHeight() / 2 - bulletTexture.getHeight() / 2);
-			bullets.add(bulletPosition);
+	private void drawMaze() {
+		for (int x = 0; x < MAP_WIDTH; x++) {
+			for (int y = 0; y < MAP_HEIGHT; y++) {
+				if (mazeGenerator.isWall(x, y)) {
+					Wall wall = new Wall(new Texture("wall.png"), x * TILE_SIZE, y * TILE_SIZE);
+					wall.render(batch);
+				}
+			}
 		}
 	}
 
-	private void update() {
-		tankPosition.add(tankVelocity);
+	private void handleInput() {
+		Vector2 movement = new Vector2();
 
-		// Проверка коллизии с границами экрана
-		if (tankPosition.x < 0) {
-			tankPosition.x = 0;
-		} else if (tankPosition.x > WORLD_WIDTH - TILE_SIZE) {
-			tankPosition.x = WORLD_WIDTH - TILE_SIZE;
+		if (Gdx.input.isKeyPressed(Input.Keys.UP)) {
+			movement.y += 1;
 		}
-		if (tankPosition.y < 0) {
-			tankPosition.y = 0;
-		} else if (tankPosition.y > WORLD_HEIGHT - TILE_SIZE) {
-			tankPosition.y = WORLD_HEIGHT - TILE_SIZE;
+		if (Gdx.input.isKeyPressed(Input.Keys.DOWN)) {
+			movement.y -= 1;
 		}
-
-		// Обновление положения снарядов
-		for (int i = bullets.size - 1; i >= 0; i--) {
-			Vector2 bullet = bullets.get(i);
-			bullet.y += BULLET_SPEED;
-
-			// Удаление снарядов, вышедших за пределы экрана
-			if (bullet.y > WORLD_HEIGHT) {
-				bullets.removeIndex(i);
-			}
+		if (Gdx.input.isKeyPressed(Input.Keys.LEFT)) {
+			movement.x -= 1;
+		}
+		if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
+			movement.x += 1;
 		}
 
-		// Обновление положения врагов
-		for (Rectangle enemy : enemies) {
-			enemy.x += ENEMY_SPEED * Gdx.graphics.getDeltaTime();
-
-			// Логика атаки врагов
-			if (enemy.x < tankPosition.x + tankTexture.getWidth() &&
-					enemy.x + enemy.width > tankPosition.x &&
-					enemy.y < tankPosition.y + tankTexture.getHeight() &&
-					enemy.y + enemy.height > tankPosition.y) {
-				health -= 10;
-				if (health <= 0) {
-					// Game over
-				}
-			}
-
-			// Проверка коллизии снарядов и врагов
-			for (int i = bullets.size - 1; i >= 0; i--) {
-				Vector2 bullet = bullets.get(i);
-				if (bullet.x < enemy.x + enemy.width && bullet.x + bulletTexture.getWidth() > enemy.x &&
-						bullet.y < enemy.y + enemy.height && bullet.y + bulletTexture.getHeight() > enemy.y) {
-					bullets.removeIndex(i);
-					enemies.removeValue(enemy, true);
-					score += 10;
-					break;
-				}
-			}
-		}
-
-		// Проверка коллизии со стенами
-		for (Rectangle wall : walls) {
-			if (tankPosition.x < wall.x + wall.width && tankPosition.x + TILE_SIZE > wall.x &&
-					tankPosition.y < wall.y + wall.height && tankPosition.y + TILE_SIZE > wall.y) {
-				tankVelocity.set(0, 0); // Остановка танка
-				break;
-			}
-		}
+		playerTank.move(movement);
 	}
 
 	@Override
 	public void dispose() {
 		batch.dispose();
-		tankTexture.dispose();
-		bulletTexture.dispose();
-		enemyTexture.dispose();
-		font.dispose();
+		playerTank.dispose();
+		for (EnemyTank enemyTank : enemyTanks) {
+			enemyTank.dispose();
+		}
 	}
 }
